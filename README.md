@@ -34,7 +34,12 @@ A streamlined study companion app that combines a focus timer with social featur
 
 ## 📄 License
 
-This project is open‑source and available under the **MIT License**.
+This application's source code is shared under the **PolyForm Noncommercial License 1.0.0**. 
+
+* **Personal & Educational Use:** Free to use, modify, and explore. You must give credit to the original author.
+* **Commercial Use:** If you intend to use this code to earn revenue, build a commercial product, or use it within a business, you **must purchase a commercial license**.
+
+For commercial licensing terms and pricing, please contact me at: `kurtislam100@gmail.com`
 
 ---
 
