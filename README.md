@@ -15,15 +15,6 @@ A streamlined study companion app that combines a focus timer with social featur
 
 ---
 
-## 🛠️ Technology Stack
-
-- **Frontend**: React 18 (UMD), Tailwind CSS, Babel standalone
-- **Backend**: Firebase (Auth, Firestore)
-- **Image Hosting**: Cloudinary (unsigned upload preset)
-- **Format**: Single HTML file – no build step required.
-
----
-
 ## 🖥️ Usage
 
 1. Locate apk/studysync.apk
